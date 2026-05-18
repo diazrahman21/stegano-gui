@@ -25,35 +25,187 @@ st.set_page_config(
 # Styling
 st.markdown("""
 <style>
-    .main {
-        padding: 2rem;
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap');
+
+    :root {
+        --bg-base: #f6f7f9;
+        --bg-panel: #ffffff;
+        --bg-elev: #f1f3f6;
+        --text-primary: #0f172a;
+        --text-muted: #5b6474;
+        --accent: #0ea5a4;
+        --accent-strong: #0b8c8b;
+        --border-soft: #e5e7eb;
+        --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.08);
+        --radius-lg: 18px;
+        --radius-md: 12px;
+        --radius-sm: 10px;
     }
-    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-        font-size: 1.1rem;
-        font-weight: 500;
+
+    html, body, [class*="css"] {
+        font-family: 'Manrope', sans-serif;
+        color: var(--text-primary);
     }
+
+    .stApp {
+        background: radial-gradient(1200px 600px at 80% -10%, rgba(14, 165, 164, 0.08), transparent 55%),
+                    radial-gradient(900px 500px at 10% 0%, rgba(15, 23, 42, 0.06), transparent 50%),
+                    var(--bg-base);
+    }
+
+    .block-container {
+        padding: 2.25rem 2.5rem 4rem;
+        max-width: 1200px;
+    }
+
+    h1, h2, h3, h4 {
+        color: var(--text-primary);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+    }
+
     h1 {
-        color: #1f77b4;
         text-align: center;
+        font-size: 2.2rem;
+        margin-bottom: 0.25rem;
     }
+
     h2 {
-        color: #2ca02c;
-        border-bottom: 2px solid #2ca02c;
-        padding-bottom: 0.5rem;
+        font-size: 1.6rem;
+        margin-top: 1.6rem;
+        border-bottom: 1px solid var(--border-soft);
+        padding-bottom: 0.6rem;
     }
-    .success-box {
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 1rem 0;
+
+    h3 {
+        font-size: 1.2rem;
+        margin-top: 1.1rem;
     }
-    .info-box {
-        background-color: #cfe2ff;
-        border: 1px solid #b6d4fe;
-        padding: 1rem;
-        border-radius: 0.5rem;
+
+    p, li, span {
+        color: var(--text-muted);
+        line-height: 1.7;
+        font-weight: 400;
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        background: var(--bg-panel);
+        border-radius: var(--radius-md);
+        padding: 0.35rem 0.4rem;
+        box-shadow: var(--shadow-soft);
+        border: 1px solid var(--border-soft);
+    }
+
+    .stTabs [data-baseweb="tab-list"] button {
+        border-radius: var(--radius-sm);
+        padding: 0.4rem 0.85rem;
+    }
+
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        font-size: 0.98rem;
+        font-weight: 600;
+        color: var(--text-muted);
+    }
+
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+        background: var(--bg-elev);
+        border: 1px solid var(--border-soft);
+    }
+
+    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] p {
+        color: var(--text-primary);
+    }
+
+    .stButton > button, .stDownloadButton > button {
+        background: var(--accent);
+        color: #ffffff;
+        border: none;
+        border-radius: 999px;
+        padding: 0.55rem 1.2rem;
+        font-weight: 600;
+        box-shadow: 0 8px 18px rgba(14, 165, 164, 0.22);
+        transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        background: var(--accent-strong);
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px rgba(14, 165, 164, 0.28);
+    }
+
+    .stButton > button:focus, .stDownloadButton > button:focus {
+        outline: 2px solid rgba(14, 165, 164, 0.4);
+        outline-offset: 2px;
+    }
+
+    .stTextInput input, .stTextArea textarea, .stNumberInput input,
+    .stSelectbox select, .stFileUploader, .stDateInput input {
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-soft);
+        background: var(--bg-panel);
+        padding: 0.55rem 0.75rem;
+        box-shadow: none;
+        transition: border 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .stTextInput input:focus, .stTextArea textarea:focus, .stNumberInput input:focus,
+    .stSelectbox select:focus, .stFileUploader:focus-within, .stDateInput input:focus {
+        border-color: rgba(14, 165, 164, 0.5);
+        box-shadow: 0 0 0 3px rgba(14, 165, 164, 0.15);
+    }
+
+    .stSlider [data-baseweb="slider"] [role="slider"] {
+        color: var(--accent);
+    }
+
+    .stMetric {
+        background: var(--bg-panel);
+        border: 1px solid var(--border-soft);
+        border-radius: var(--radius-md);
+        padding: 0.85rem;
+        box-shadow: var(--shadow-soft);
+    }
+
+    .stDataFrame, .stTable {
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-soft);
+        overflow: hidden;
+        box-shadow: var(--shadow-soft);
+    }
+
+    .stAlert {
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-soft);
+        box-shadow: var(--shadow-soft);
+    }
+
+    .stSidebar {
+        background: var(--bg-panel);
+        border-right: 1px solid var(--border-soft);
+    }
+
+    .stSidebar .block-container {
+        padding: 2rem 1.5rem;
+    }
+
+    .success-box, .info-box {
+        background-color: var(--bg-panel);
+        border: 1px solid var(--border-soft);
+        padding: 1rem 1.2rem;
+        border-radius: var(--radius-md);
         margin: 1rem 0;
+        box-shadow: var(--shadow-soft);
+    }
+
+    @media (max-width: 768px) {
+        .block-container {
+            padding: 1.5rem 1.25rem 3rem;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
