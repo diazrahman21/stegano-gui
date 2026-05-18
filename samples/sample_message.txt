@@ -1,0 +1,5 @@
+
+Ini adalah pesan rahasia untuk steganografi.
+Pesan ini akan disembunyikan dalam gambar.
+DCT dan IWT adalah dua metode transformasi berbeda.
+Keamanan steganografi adalah prioritas utama.
