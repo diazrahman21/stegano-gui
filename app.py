@@ -431,6 +431,18 @@ def plot_metrics_comparison(df_metrics):
     plt.tight_layout()
     return fig
 
+def build_per_image_table(batch_df, metrics):
+    """Bangun tabel per gambar dengan kolom metrik bertingkat (DCT vs IWT)."""
+    methods = ['DCT', 'IWT']
+    pivot = batch_df.pivot_table(
+        index='filename',
+        columns='method',
+        values=metrics,
+        aggfunc='first'
+    )
+    pivot = pivot.reindex(columns=pd.MultiIndex.from_product([metrics, methods]))
+    return pivot
+
 def plot_batch_metrics(batch_df):
     """Visualisasi perbandingan metrik batch"""
     fig, axes = plt.subplots(2, 3, figsize=(16, 10))
@@ -921,20 +933,25 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
         st.markdown("### 2️⃣ Tabel Detail Hasil")
         st.dataframe(batch_df, use_container_width=True)
 
+        # ===== TABEL PER GAMBAR (DCT VS IWT) =====
+        st.markdown("### 3️⃣ Tabel Per Gambar (DCT vs IWT)")
+        per_image_df = build_per_image_table(batch_df, ['MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)'])
+        st.dataframe(per_image_df.round(4), use_container_width=True)
+
         # ===== TABEL RINGKASAN =====
-        st.markdown("### 3️⃣ Tabel Ringkasan (Rata-rata & Std Dev)")
+        st.markdown("### 4️⃣ Tabel Ringkasan (Rata-rata & Std Dev)")
         summary_df = batch_df.groupby('method')[['MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)']].agg(
             ['mean', 'std']
         ).round(4)
         st.dataframe(summary_df, use_container_width=True)
 
         # ===== GRAFIK PERBANDINGAN =====
-        st.markdown("### 4️⃣ Grafik Perbandingan")
+        st.markdown("### 5️⃣ Grafik Perbandingan")
         fig_batch = plot_batch_metrics(batch_df)
         st.pyplot(fig_batch, use_container_width=True)
 
         # ===== PREVIEW CITRA =====
-        st.markdown("### 5️⃣ Preview Citra (Maksimal 6 Gambar)")
+        st.markdown("### 6️⃣ Preview Citra (Maksimal 6 Gambar)")
 
         for preview_idx, preview in enumerate(batch_preview):
             col1, col2, col3 = st.columns(3)
