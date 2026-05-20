@@ -571,8 +571,13 @@ def generate_conclusion(df_metrics):
 # ============================================================================
 # FUNGSI BATCH PROCESSING
 # ============================================================================
-def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
-    """Proses batch gambar"""
+def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_iwt, wavelet, watermark_mode='random', watermark_data=None):
+    """Proses batch gambar
+    
+    Args:
+        watermark_mode: 'random' atau 'text'
+        watermark_data: numpy array atau text untuk embedding
+    """
     batch_rows = []
     batch_preview = []
 
@@ -581,9 +586,13 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
             img_bytes = uploaded_file.read()
             cover = preprocess_image(img_bytes, target_size)
 
-            # Generate watermark per gambar
-            rng = np.random.default_rng(42 + idx)
-            watermark = rng.integers(0, 2, wm_size, dtype=np.uint8)
+            # Generate atau gunakan watermark
+            if watermark_mode == 'text' and watermark_data is not None:
+                watermark = watermark_data
+            else:
+                # Generate watermark acak per gambar
+                rng = np.random.default_rng(42 + idx)
+                watermark = rng.integers(0, 2, wm_size, dtype=np.uint8)
 
             # Embedding
             stego_dct_img = embed_dct(cover, watermark, alpha=alpha_dct)
@@ -956,11 +965,58 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
     st.info(f"📁 Anda telah upload {len(uploaded_files)} gambar")
 
+    # ===== INPUT WATERMARK =====
+    st.markdown("### 2️⃣ Input Pesan / Watermark")
+
+    watermark_choice = st.radio("Pilih sumber watermark:", 
+                                ["Watermark Acak", "Upload File TXT"])
+
+    watermark_batch = None
+    watermark_mode = 'random'
+
+    if watermark_choice == "Upload File TXT":
+        txt_file = st.file_uploader("Upload file TXT", type=['txt'], key='batch_txt')
+
+        if txt_file is not None:
+            try:
+                original_text = txt_file.read().decode('utf-8', errors='ignore')
+                message_binary = text_to_binary(original_text)
+
+                # Cek kapasitas
+                total_capacity = wm_size[0] * wm_size[1]
+                if len(message_binary) > total_capacity:
+                    st.error(f"❌ Pesan terlalu panjang! Maksimal {total_capacity // 8} karakter. "
+                            f"Anda memasukkan {len(original_text)} karakter.")
+                else:
+                    message_binary_padded = message_binary.ljust(total_capacity, '0')
+                    watermark_batch = np.array([int(bit) for bit in message_binary_padded], 
+                                        dtype=np.uint8).reshape(wm_size)
+                    watermark_mode = 'text'
+
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Nama File", txt_file.name)
+                    with col2:
+                        st.metric("Panjang Pesan", f"{len(original_text)} karakter")
+                    with col3:
+                        st.metric("Panjang Biner", f"{len(message_binary)} bit")
+                    with col4:
+                        st.metric("Kapasitas", f"{total_capacity} bit")
+
+                    st.success("✅ Pesan berhasil dikonversi ke watermark")
+
+            except Exception as e:
+                st.error(f"❌ Error membaca file: {str(e)}")
+
+    if watermark_choice == "Watermark Acak" or watermark_batch is None:
+        st.info("✅ Watermark acak akan digunakan untuk setiap gambar (berbeda per gambar)")
+
     # Proses batch
     if st.button("🚀 Mulai Proses Batch", key="process_batch", use_container_width=True):
         with st.spinner(f"⏳ Sedang memproses {len(uploaded_files)} gambar..."):
             batch_rows, batch_preview = process_batch_images(
-                uploaded_files, target_size, wm_size, alpha_dct, alpha_iwt, wavelet
+                uploaded_files, target_size, wm_size, alpha_dct, alpha_iwt, wavelet,
+                watermark_mode=watermark_mode, watermark_data=watermark_batch
             )
 
         if not batch_rows:
@@ -974,30 +1030,30 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
         st.success(f"✅ Berhasil memproses {len(batch_df) // 2} gambar!")
 
         # ===== TABEL DETAIL =====
-        st.markdown("### 2️⃣ Tabel Detail Hasil")
+        st.markdown("### 3️⃣ Tabel Detail Hasil")
         metrics_list = ['MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)']
         detail_formatted = format_detail_table(batch_df, metrics_list)
         st.dataframe(detail_formatted.round(4), use_container_width=True)
 
         # ===== TABEL PER GAMBAR (DCT VS IWT) =====
-        st.markdown("### 3️⃣ Tabel Per Gambar (DCT vs IWT)")
+        st.markdown("### 4️⃣ Tabel Per Gambar (DCT vs IWT)")
         per_image_df = build_per_image_table(batch_df, ['MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)'])
         st.dataframe(per_image_df.round(4), use_container_width=True)
 
         # ===== TABEL RINGKASAN =====
-        st.markdown("### 4️⃣ Tabel Ringkasan (Rata-rata & Std Dev)")
+        st.markdown("### 5️⃣ Tabel Ringkasan (Rata-rata & Std Dev)")
         summary_df = batch_df.groupby('method')[['MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)']].agg(
             ['mean', 'std']
         ).round(4)
         st.dataframe(summary_df, use_container_width=True)
 
         # ===== GRAFIK PERBANDINGAN =====
-        st.markdown("### 5️⃣ Grafik Perbandingan")
+        st.markdown("### 6️⃣ Grafik Perbandingan")
         fig_batch = plot_batch_metrics(batch_df)
         st.pyplot(fig_batch, use_container_width=True)
 
         # ===== PREVIEW CITRA =====
-        st.markdown("### 6️⃣ Preview Citra (Maksimal 6 Gambar)")
+        st.markdown("### 7️⃣ Preview Citra (Maksimal 6 Gambar)")
 
         for preview_idx, preview in enumerate(batch_preview):
             col1, col2, col3 = st.columns(3)
