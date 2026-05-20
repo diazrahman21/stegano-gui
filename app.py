@@ -432,16 +432,60 @@ def plot_metrics_comparison(df_metrics):
     return fig
 
 def build_per_image_table(batch_df, metrics):
-    """Bangun tabel per gambar dengan kolom metrik bertingkat (DCT vs IWT)."""
-    methods = ['DCT', 'IWT']
-    pivot = batch_df.pivot_table(
+    """Bangun tabel per gambar dengan kolom metrik bertingkat (Metric: DCT vs IWT)."""
+    # Pivot: index=filename, columns=method, values=metrics
+    pivot_df = batch_df.pivot_table(
         index='filename',
         columns='method',
         values=metrics,
         aggfunc='first'
     )
-    pivot = pivot.reindex(columns=pd.MultiIndex.from_product([metrics, methods]))
-    return pivot
+    
+    # Reorder columns: (Metric, Method) dengan urutan Metric pertama, Method kedua
+    # Sehingga hasilnya: MSE-DCT, MSE-IWT, PSNR-DCT, PSNR-IWT, ...
+    ordered_cols = [(metric, method) for metric in metrics for method in ['DCT', 'IWT']]
+    pivot_df = pivot_df[ordered_cols]
+    
+    # Set nama level pada MultiIndex
+    pivot_df.columns.names = ['Metric', 'Method']
+    
+    return pivot_df
+
+def format_detail_table(batch_df, metrics):
+    """Format tabel detail dengan kolom metrik bertingkat (Metric: DCT vs IWT)."""
+    # Buat MultiIndex columns
+    data_list = []
+    
+    for _, row in batch_df.iterrows():
+        row_dict = {}
+        row_dict[('', 'Filename')] = row['filename']
+        row_dict[('', 'Method')] = row['method']
+        
+        for metric in metrics:
+            row_dict[(metric, '')] = row[metric]
+        
+        data_list.append(row_dict)
+    
+    detail_df = pd.DataFrame(data_list)
+    
+    # Flatten MultiIndex columns untuk hasil yang lebih baik
+    # Restructure: Group by filename+method, kemudian pivotkan metrics dengan DCT/IWT
+    detail_grouped = batch_df.set_index(['filename', 'method'])[metrics].reset_index()
+    
+    # Pivot untuk mendapatkan struktur yang lebih baik
+    result = detail_grouped.pivot_table(
+        index='filename',
+        columns='method',
+        values=metrics,
+        aggfunc='first'
+    )
+    
+    # Reorder columns
+    ordered_cols = [(metric, method) for metric in metrics for method in ['DCT', 'IWT']]
+    result = result[ordered_cols]
+    result.columns.names = ['Metric', 'Method']
+    
+    return result
 
 def plot_batch_metrics(batch_df):
     """Visualisasi perbandingan metrik batch"""
@@ -931,7 +975,9 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         # ===== TABEL DETAIL =====
         st.markdown("### 2️⃣ Tabel Detail Hasil")
-        st.dataframe(batch_df, use_container_width=True)
+        metrics_list = ['MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)']
+        detail_formatted = format_detail_table(batch_df, metrics_list)
+        st.dataframe(detail_formatted.round(4), use_container_width=True)
 
         # ===== TABEL PER GAMBAR (DCT VS IWT) =====
         st.markdown("### 3️⃣ Tabel Per Gambar (DCT vs IWT)")
