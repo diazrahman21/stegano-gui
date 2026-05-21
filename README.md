@@ -196,7 +196,7 @@ Steganografi gui/
 
 # Embedding & Ekstraksi
 - embed_dct()                 # Penyisipan DCT
-- embed_iwt_ll()              # Penyisipan IWT pada subband LL
+- embed_iwt_hh()              # Penyisipan IWT pada subband HH
 - extract_dct()               # Ekstraksi dari DCT
 - extract_iwt()               # Ekstraksi dari IWT
 
@@ -235,12 +235,12 @@ Steganografi gui/
 
 **Karakteristik:**
 - Transformasi wavelet berbasis dekomposisi 1-level
-- Memodifikasi subband LL dengan scaling alpha
+- Memodifikasi subband HH dengan scaling alpha
 - Menggunakan wavelet Haar (atau db2, db4)
 
 **Kelebihan:**
 - Operasi integer (tidak ada loss dalam quantization)
-- Cocok untuk frekuensi rendah
+- Cocok untuk frekuensi tinggi
 - Lebih robust untuk keamanan
 
 **Kekurangan:**

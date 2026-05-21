@@ -290,23 +290,28 @@ def embed_dct(cover_img, watermark_bits, alpha=10.0):
 # ============================================================================
 # FUNGSI EMBEDDING IWT
 # ============================================================================
-def embed_iwt_ll(cover_img, watermark_bits, alpha=2.0, wavelet='haar'):
-    """Embedding watermark pada subband LL menggunakan IWT"""
+def embed_iwt_hh(cover_img, watermark_bits, alpha=2.0, wavelet='haar'):
+    """Embedding watermark pada subband HH menggunakan IWT"""
     cover_int = cover_img.astype(np.int16)
     LL, (LH, HL, HH) = pywt.dwt2(cover_int, wavelet)
 
-    wm_ll = cv2.resize(watermark_bits.astype(np.float32), 
-                       (LL.shape[1], LL.shape[0]), 
+    wm_hh = cv2.resize(watermark_bits.astype(np.float32),
+                       (HH.shape[1], HH.shape[0]),
                        interpolation=cv2.INTER_NEAREST)
-    wm_sign = (wm_ll * 2.0) - 1.0
+    wm_sign = (wm_hh * 2.0) - 1.0
 
-    LL_embedded = LL + alpha * wm_sign
-    stego_recon = pywt.idwt2((LL_embedded, (LH, HL, HH)), wavelet)
+    HH_embedded = HH + alpha * wm_sign
+    stego_recon = pywt.idwt2((LL, (LH, HL, HH_embedded)), wavelet)
     stego_recon = np.clip(np.round(stego_recon), 0, 255).astype(np.uint8)
     stego_recon = cv2.resize(stego_recon, (cover_img.shape[1], cover_img.shape[0]), 
                              interpolation=cv2.INTER_AREA)
 
     return stego_recon
+
+
+def embed_iwt_ll(cover_img, watermark_bits, alpha=2.0, wavelet='haar'):
+    """Alias lama untuk kompatibilitas; embedding sekarang memakai subband HH."""
+    return embed_iwt_hh(cover_img, watermark_bits, alpha=alpha, wavelet=wavelet)
 
 # ============================================================================
 # FUNGSI EKSTRAKSI DCT
@@ -340,11 +345,11 @@ def extract_dct(stego_img, alpha=10.0):
 def extract_iwt(stego_img, wavelet='haar'):
     """Ekstraksi watermark dari stego IWT"""
     stego_int = stego_img.astype(np.int16)
-    LL, _ = pywt.dwt2(stego_int, wavelet)
+    _, (_, _, HH) = pywt.dwt2(stego_int, wavelet)
 
-    LL_min, LL_max = LL.min(), LL.max()
-    LL_norm = (LL - LL_min) / (LL_max - LL_min + 1e-12)
-    extracted = (LL_norm > 0.5).astype(np.uint8)
+    HH_min, HH_max = HH.min(), HH.max()
+    HH_norm = (HH - HH_min) / (HH_max - HH_min + 1e-12)
+    extracted = (HH_norm > 0.5).astype(np.uint8)
     extracted_resized = cv2.resize(extracted.astype(np.float32), (64, 64), 
                                    interpolation=cv2.INTER_NEAREST)
 
@@ -596,7 +601,7 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
 
             # Embedding
             stego_dct_img = embed_dct(cover, watermark, alpha=alpha_dct)
-            stego_iwt_img = embed_iwt_ll(cover, watermark, alpha=alpha_iwt, wavelet=wavelet)
+            stego_iwt_img = embed_iwt_hh(cover, watermark, alpha=alpha_iwt, wavelet=wavelet)
 
             # Metrik
             dct_m = evaluate_all(cover, stego_dct_img)
@@ -675,7 +680,7 @@ def page_home():
         """)
 
     with col2:
-        st.image("https://via.placeholder.com/300x200?text=Steganografi", use_column_width=True)
+        st.image("https://via.placeholder.com/300x200?text=Steganografi", width="stretch")
 
     st.markdown("---")
 
@@ -689,10 +694,10 @@ def page_home():
     - Cocok untuk menjaga kualitas visual pada citra natural
 
     **IWT (Integer Wavelet Transform)**
-    - Transformasi wavelet berbasis subband LL
+    - Transformasi wavelet berbasis subband HH
     - Menggunakan dekomposisi Haar 1-level
-    - Modifikasi langsung pada koefisien LL dengan scaling alpha
-    - Efektif untuk menyembunyikan informasi di frekuensi rendah
+    - Modifikasi langsung pada koefisien HH dengan scaling alpha
+    - Efektif untuk menyembunyikan informasi di frekuensi tinggi
 
     #### 📊 Metrik Evaluasi
 
@@ -750,7 +755,7 @@ def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Preview Citra Asli")
-        st.image(cover_gray, use_column_width=True, clamp=True)
+        st.image(cover_gray, width="stretch", clamp=True)
     with col2:
         st.subheader("Histogram Citra Asli")
         fig_hist, ax = plt.subplots(figsize=(8, 4))
@@ -817,7 +822,7 @@ def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
         with st.spinner("⏳ Sedang memproses... Mohon tunggu"):
             # Embedding
             stego_dct = embed_dct(cover_gray, watermark, alpha=alpha_dct)
-            stego_iwt = embed_iwt_ll(cover_gray, watermark, alpha=alpha_iwt, wavelet=wavelet)
+            stego_iwt = embed_iwt_hh(cover_gray, watermark, alpha=alpha_iwt, wavelet=wavelet)
 
             # Ekstraksi
             extracted_dct = extract_dct(stego_dct, alpha=alpha_dct)
@@ -836,15 +841,15 @@ def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col1:
             st.subheader("Citra Asli")
-            st.image(cover_gray, use_column_width=True, clamp=True)
+            st.image(cover_gray, width="stretch", clamp=True)
 
         with col2:
             st.subheader("Stego DCT")
-            st.image(stego_dct, use_column_width=True, clamp=True)
+            st.image(stego_dct, width="stretch", clamp=True)
 
         with col3:
             st.subheader("Stego IWT")
-            st.image(stego_iwt, use_column_width=True, clamp=True)
+            st.image(stego_iwt, width="stretch", clamp=True)
 
         # Histogram
         st.markdown("### 📊 Histogram Citra")
@@ -1060,15 +1065,15 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
             with col1:
                 st.markdown(f"**Cover: {preview['name']}**")
-                st.image(preview['cover'], use_column_width=True, clamp=True)
+                st.image(preview['cover'], width="stretch", clamp=True)
 
             with col2:
                 st.markdown("**Stego DCT**")
-                st.image(preview['stego_dct'], use_column_width=True, clamp=True)
+                st.image(preview['stego_dct'], width="stretch", clamp=True)
 
             with col3:
                 st.markdown("**Stego IWT**")
-                st.image(preview['stego_iwt'], use_column_width=True, clamp=True)
+                st.image(preview['stego_iwt'], width="stretch", clamp=True)
 
             if preview_idx < len(batch_preview) - 1:
                 st.divider()
