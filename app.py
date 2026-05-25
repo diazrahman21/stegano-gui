@@ -337,18 +337,28 @@ def extract_dct(stego_img, alpha=10.0):
 # ============================================================================
 # FUNGSI EKSTRAKSI IWT
 # ============================================================================
-def extract_iwt(stego_img, wavelet='haar'):
-    """Ekstraksi watermark dari stego IWT"""
+def extract_iwt(stego_img, cover_img=None, watermark_shape=(64, 64), wavelet='haar'):
+    """Ekstraksi watermark dari stego IWT.
+
+    Jika cover_img tersedia, ekstraksi dilakukan dari selisih koefisien HH
+    stego dan cover. Ini sesuai dengan embedding yang menambah/mengurangi
+    koefisien HH berdasarkan bit watermark.
+    """
     stego_int = stego_img.astype(np.int16)
     _, (_, _, HH) = pywt.dwt2(stego_int, wavelet)
 
-    HH_min, HH_max = HH.min(), HH.max()
-    HH_norm = (HH - HH_min) / (HH_max - HH_min + 1e-12)
-    extracted = (HH_norm > 0.5).astype(np.uint8)
-    extracted_resized = cv2.resize(extracted.astype(np.float32), (64, 64), 
-                                   interpolation=cv2.INTER_NEAREST)
+    if cover_img is not None:
+        cover_int = cover_img.astype(np.int16)
+        _, (_, _, HH_cover) = pywt.dwt2(cover_int, wavelet)
+        signal = HH - HH_cover
+    else:
+        HH_min, HH_max = HH.min(), HH.max()
+        signal = (HH - HH_min) / (HH_max - HH_min + 1e-12) - 0.5
 
-    return extracted_resized.astype(np.uint8)
+    signal_resized = cv2.resize(signal.astype(np.float32),
+                                (watermark_shape[1], watermark_shape[0]),
+                                interpolation=cv2.INTER_AREA)
+    return (signal_resized > 0).astype(np.uint8)
 
 # ============================================================================
 # FUNGSI METRIK KUALITAS & KEAMANAN
@@ -821,7 +831,7 @@ def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
             # Ekstraksi
             extracted_dct = extract_dct(stego_dct, alpha=alpha_dct)
-            extracted_iwt = extract_iwt(stego_iwt, wavelet=wavelet)
+            extracted_iwt = extract_iwt(stego_iwt, cover_gray, watermark.shape, wavelet=wavelet)
 
             # Metrik
             metrics_dct = evaluate_all(cover_gray, stego_dct)
@@ -868,16 +878,16 @@ def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
             with col1:
                 st.markdown("**Pesan Asli**")
-                st.text_area("", value=original_text, height=100, disabled=True)
+                st.text_area("", value=original_text, height=100, disabled=True, key="single_original_text")
 
             with col2:
                 st.markdown("**Ekstraksi DCT**")
-                st.text_area("", value=reconstructed_msg_dct, height=100, disabled=True)
+                st.text_area("", value=reconstructed_msg_dct, height=100, disabled=True, key="single_extracted_dct_text")
                 st.metric("Akurasi DCT", f"{acc_dct:.2f}%")
 
             with col3:
                 st.markdown("**Ekstraksi IWT**")
-                st.text_area("", value=reconstructed_msg_iwt, height=100, disabled=True)
+                st.text_area("", value=reconstructed_msg_iwt, height=100, disabled=True, key="single_extracted_iwt_text")
                 st.metric("Akurasi IWT", f"{acc_iwt:.2f}%")
 
         # ===== TABEL METRIK =====
