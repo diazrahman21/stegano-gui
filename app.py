@@ -309,8 +309,8 @@ def embed_iwt_hh(cover_img, watermark_bits, alpha=2.0, wavelet='haar'):
     return stego_recon
 
 
-def embed_iwt_ll(cover_img, watermark_bits, alpha=2.0, wavelet='haar'):
-    """Alias lama untuk kompatibilitas; embedding sekarang memakai subband HH."""
+def embed_iwt_hh(cover_img, watermark_bits, alpha=2.0, wavelet='haar'):
+    """Alias untuk kompatibilitas;embedding memakai subband HH."""
     return embed_iwt_hh(cover_img, watermark_bits, alpha=alpha, wavelet=wavelet)
 
 # ============================================================================
