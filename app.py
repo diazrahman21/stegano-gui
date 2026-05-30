@@ -582,14 +582,20 @@ def generate_conclusion(df_metrics):
 # FUNGSI BATCH PROCESSING
 # ============================================================================
 def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_iwt, wavelet, watermark_mode='random', watermark_data=None):
-    """Proses batch gambar
+    """Proses batch gambar dengan ekstraksi
     
     Args:
         watermark_mode: 'random' atau 'text'
-        watermark_data: numpy array atau text untuk embedding
+        watermark_data: numpy array untuk embedding
+    Returns:
+        batch_rows: list of metric dicts
+        batch_preview: list of image preview dicts
+        extraction_results: list of extraction result dicts
     """
     batch_rows = []
     batch_preview = []
+    batch_stego_all = []  # Simpan semua stego images untuk download
+    extraction_results = []
 
     for idx, uploaded_file in enumerate(uploaded_files):
         try:
@@ -599,14 +605,33 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
             # Generate atau gunakan watermark
             if watermark_mode == 'text' and watermark_data is not None:
                 watermark = watermark_data
+                original_message = None
             else:
                 # Generate watermark acak per gambar
                 rng = np.random.default_rng(42 + idx)
                 watermark = rng.integers(0, 2, wm_size, dtype=np.uint8)
+                original_message = None
 
             # Embedding
             stego_dct_img = embed_dct(cover, watermark, alpha=alpha_dct)
             stego_iwt_img = embed_iwt_hh(cover, watermark, alpha=alpha_iwt, wavelet=wavelet)
+
+            # Ekstraksi
+            extracted_dct = extract_dct(stego_dct_img, alpha=alpha_dct)
+            extracted_iwt = extract_iwt(stego_iwt_img, cover, watermark.shape, wavelet=wavelet)
+
+            # Hitung akurasi ekstraksi
+            acc_dct = np.mean(extracted_dct == watermark) * 100
+            acc_iwt = np.mean(extracted_iwt == watermark) * 100
+
+            # Konversi ke teks jika watermark_mode adalah 'text'
+            extracted_msg_dct = None
+            extracted_msg_iwt = None
+            if watermark_mode == 'text':
+                extracted_binary_dct = ''.join(extracted_dct.flatten().astype(str))
+                extracted_binary_iwt = ''.join(extracted_iwt.flatten().astype(str))
+                extracted_msg_dct = binary_to_text(extracted_binary_dct)
+                extracted_msg_iwt = binary_to_text(extracted_binary_iwt)
 
             # Metrik
             dct_m = evaluate_all(cover, stego_dct_img)
@@ -623,6 +648,28 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
                 **iwt_m
             })
 
+            # Simpan hasil ekstraksi
+            extraction_results.append({
+                'filename': uploaded_file.name,
+                'watermark_mode': watermark_mode,
+                'acc_dct': acc_dct,
+                'acc_iwt': acc_iwt,
+                'extracted_msg_dct': extracted_msg_dct,
+                'extracted_msg_iwt': extracted_msg_iwt,
+                'original_message': original_message,
+                'extracted_dct': extracted_dct,
+                'extracted_iwt': extracted_iwt,
+            })
+
+            # Simpan stego images untuk download (semua gambar)
+            filename_without_ext = os.path.splitext(uploaded_file.name)[0]
+            batch_stego_all.append({
+                'filename': uploaded_file.name,
+                'filename_base': filename_without_ext,
+                'stego_dct': stego_dct_img,
+                'stego_iwt': stego_iwt_img
+            })
+
             # Preview
             if len(batch_preview) < 6:
                 batch_preview.append({
@@ -636,7 +683,7 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
             st.warning(f"⚠️ Gagal memproses {uploaded_file.name}: {str(e)}")
             continue
 
-    return batch_rows, batch_preview
+    return batch_rows, batch_preview, extraction_results, batch_stego_all
 
 # ============================================================================
 # FUNGSI DOWNLOAD
@@ -662,6 +709,42 @@ def get_csv_download_buffer(df):
     df.to_csv(buf, index=False)
     buf.seek(0)
     return buf
+
+def get_zip_stego_images(batch_stego_all, method='both'):
+    """Buat ZIP file berisi stego images
+    
+    Args:
+        batch_stego_all: List of stego image data
+        method: 'dct', 'iwt', atau 'both'
+    
+    Returns:
+        BytesIO buffer containing ZIP file
+    """
+    import zipfile
+    
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for item in batch_stego_all:
+            filename_base = item['filename_base']
+            
+            if method in ['dct', 'both']:
+                # Add DCT stego image
+                img_dct_pil = Image.fromarray(item['stego_dct'])
+                img_dct_buffer = io.BytesIO()
+                img_dct_pil.save(img_dct_buffer, format='PNG')
+                img_dct_buffer.seek(0)
+                zip_file.writestr(f"stego_dct_{filename_base}.png", img_dct_buffer.getvalue())
+            
+            if method in ['iwt', 'both']:
+                # Add IWT stego image
+                img_iwt_pil = Image.fromarray(item['stego_iwt'])
+                img_iwt_buffer = io.BytesIO()
+                img_iwt_pil.save(img_iwt_buffer, format='PNG')
+                img_iwt_buffer.seek(0)
+                zip_file.writestr(f"stego_iwt_{filename_base}.png", img_iwt_buffer.getvalue())
+    
+    zip_buffer.seek(0)
+    return zip_buffer
 
 # ============================================================================
 # HALAMAN UTAMA (HOME)
@@ -1023,11 +1106,16 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
     # Proses batch
     if st.button("🚀 Mulai Proses Batch", key="process_batch", use_container_width=True):
-        with st.spinner(f"⏳ Sedang memproses {len(uploaded_files)} gambar..."):
-            batch_rows, batch_preview = process_batch_images(
-                uploaded_files, target_size, wm_size, alpha_dct, alpha_iwt, wavelet,
-                watermark_mode=watermark_mode, watermark_data=watermark_batch
-            )
+        # Container untuk progress
+        progress_container = st.container()
+        extraction_results_container = st.container()
+        
+        with progress_container:
+            with st.spinner(f"⏳ Sedang memproses {len(uploaded_files)} gambar..."):
+                batch_rows, batch_preview, extraction_results, batch_stego_all = process_batch_images(
+                    uploaded_files, target_size, wm_size, alpha_dct, alpha_iwt, wavelet,
+                    watermark_mode=watermark_mode, watermark_data=watermark_batch
+                )
 
         if not batch_rows:
             st.error("❌ Tidak ada gambar valid yang berhasil diproses")
@@ -1038,7 +1126,67 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
         batch_df = batch_df[cols].round(4)
 
         st.success(f"✅ Berhasil memproses {len(batch_df) // 2} gambar!")
-
+        
+        # ===== HASIL EKSTRAKSI PESAN =====
+        if watermark_mode == 'text':
+            with extraction_results_container:
+                st.markdown("### 🔐 Hasil Ekstraksi Pesan")
+                
+                # Buat tabel akurasi ekstraksi
+                extraction_acc_data = []
+                for result in extraction_results:
+                    extraction_acc_data.append({
+                        'Gambar': result['filename'],
+                        'Akurasi DCT (%)': f"{result['acc_dct']:.2f}%",
+                        'Akurasi IWT (%)': f"{result['acc_iwt']:.2f}%"
+                    })
+                
+                extraction_acc_df = pd.DataFrame(extraction_acc_data)
+                st.dataframe(extraction_acc_df, use_container_width=True)
+                
+                # Tampilkan detail ekstraksi per gambar
+                st.markdown("#### Detail Ekstraksi Per Gambar")
+                
+                for result_idx, result in enumerate(extraction_results):
+                    with st.expander(f"📄 {result['filename']} - Akurasi DCT: {result['acc_dct']:.1f}%, IWT: {result['acc_iwt']:.1f}%"):
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.markdown("**Ekstraksi DCT**")
+                            st.text_area(
+                                "Pesan Terekstrak",
+                                value=result['extracted_msg_dct'] or "N/A",
+                                height=80,
+                                disabled=True,
+                                key=f"batch_extracted_dct_{result_idx}"
+                            )
+                            st.metric("Akurasi", f"{result['acc_dct']:.2f}%")
+                        
+                        with col2:
+                            st.markdown("**Ekstraksi IWT**")
+                            st.text_area(
+                                "Pesan Terekstrak",
+                                value=result['extracted_msg_iwt'] or "N/A",
+                                height=80,
+                                disabled=True,
+                                key=f"batch_extracted_iwt_{result_idx}"
+                            )
+                            st.metric("Akurasi", f"{result['acc_iwt']:.2f}%")
+        else:
+            # Untuk watermark acak, tampilkan ringkas akurasi
+            with extraction_results_container:
+                st.markdown("### 🔐 Hasil Ekstraksi (Watermark Acak)")
+                
+                extraction_acc_data = []
+                for result in extraction_results:
+                    extraction_acc_data.append({
+                        'Gambar': result['filename'],
+                        'Akurasi DCT (%)': f"{result['acc_dct']:.2f}%",
+                        'Akurasi IWT (%)': f"{result['acc_iwt']:.2f}%"
+                    })
+                
+                extraction_acc_df = pd.DataFrame(extraction_acc_data)
+                st.dataframe(extraction_acc_df, use_container_width=True)
         # ===== TABEL DETAIL =====
         st.markdown("### 3️⃣ Tabel Detail Hasil")
         metrics_list = ['MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)']
@@ -1110,6 +1258,35 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
                 data=get_download_buffer(fig_batch),
                 file_name=f"batch_metrics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
                 mime="image/png"
+            )
+
+        # ===== DOWNLOAD STEGO IMAGES =====
+        st.markdown("#### 🖼️ Download Gambar Stego")
+        
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.download_button(
+                label="🖼️ Semua Stego DCT (ZIP)",
+                data=get_zip_stego_images(batch_stego_all, method='dct'),
+                file_name=f"batch_stego_dct_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                mime="application/zip"
+            )
+
+        with col2:
+            st.download_button(
+                label="🖼️ Semua Stego IWT (ZIP)",
+                data=get_zip_stego_images(batch_stego_all, method='iwt'),
+                file_name=f"batch_stego_iwt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                mime="application/zip"
+            )
+
+        with col3:
+            st.download_button(
+                label="🖼️ Semua Stego (DCT+IWT ZIP)",
+                data=get_zip_stego_images(batch_stego_all, method='both'),
+                file_name=f"batch_stego_all_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                mime="application/zip"
             )
 
 # ============================================================================
