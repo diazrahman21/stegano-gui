@@ -896,7 +896,7 @@ def page_home():
 # HALAMAN SINGLE IMAGE
 # ============================================================================
 def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
-    st.title("📸 Single Image Processing")
+    st.title(" Single Image Processing")
     st.markdown("Analisis steganografi untuk satu gambar")
 
     # Upload gambar
@@ -1078,7 +1078,7 @@ def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col1:
             st.download_button(
-                label="📥 Stego DCT (PNG)",
+                label=" Stego DCT (PNG)",
                 data=get_image_download_buffer(stego_dct),
                 file_name=f"stego_dct_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
                 mime="image/png"
@@ -1086,7 +1086,7 @@ def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col2:
             st.download_button(
-                label="📥 Stego IWT (PNG)",
+                label=" Stego IWT (PNG)",
                 data=get_image_download_buffer(stego_iwt),
                 file_name=f"stego_iwt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
                 mime="image/png"
@@ -1094,7 +1094,7 @@ def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col3:
             st.download_button(
-                label="📥 Histogram (PNG)",
+                label=" Histogram (PNG)",
                 data=get_download_buffer(fig_hist_compare),
                 file_name=f"histogram_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
                 mime="image/png"
@@ -1104,7 +1104,7 @@ def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col1:
             st.download_button(
-                label="📥 Grafik Metrik (PNG)",
+                label=" Grafik Metrik (PNG)",
                 data=get_download_buffer(fig_compare),
                 file_name=f"metrics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
                 mime="image/png"
@@ -1112,7 +1112,7 @@ def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col2:
             st.download_button(
-                label="📥 Hasil CSV",
+                label=" Hasil CSV",
                 data=get_csv_download_buffer(df_metrics.reset_index()),
                 file_name=f"results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
@@ -1125,7 +1125,7 @@ def page_single_image(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 # HALAMAN BATCH PROCESSING
 # ============================================================================
 def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
-    st.title("🎞️ Batch Processing")
+    st.title(" Batch Processing")
     st.markdown("Analisis steganografi untuk banyak gambar sekaligus")
 
     # Upload multiple images
@@ -1315,6 +1315,12 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
             if preview_idx < len(batch_preview) - 1:
                 st.divider()
 
+        # ===== KESIMPULAN =====
+        st.markdown("### 8️⃣ Kesimpulan Analisis")
+        batch_metrics_summary = batch_df.groupby('method')[['MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)']].mean().round(4)
+        conclusion_text = generate_conclusion(batch_metrics_summary)
+        st.markdown(conclusion_text)
+
         # ===== DOWNLOAD =====
         st.markdown("### 📥 Download Hasil")
 
@@ -1322,7 +1328,7 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col1:
             st.download_button(
-                label="📥 Detail CSV",
+                label=" Detail CSV",
                 data=get_csv_download_buffer(batch_df),
                 file_name=f"batch_detail_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
@@ -1330,7 +1336,7 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col2:
             st.download_button(
-                label="📥 Ringkasan CSV",
+                label=" Ringkasan CSV",
                 data=get_csv_download_buffer(summary_df.reset_index()),
                 file_name=f"batch_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
@@ -1338,7 +1344,7 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col3:
             st.download_button(
-                label="📥 Grafik (PNG)",
+                label=" Grafik (PNG)",
                 data=get_download_buffer(fig_batch),
                 file_name=f"batch_metrics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
                 mime="image/png"
@@ -1351,7 +1357,7 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col1:
             st.download_button(
-                label="🖼️ Semua Stego DCT (ZIP)",
+                label=" Semua Stego DCT (ZIP)",
                 data=get_zip_stego_images(batch_stego_all, method='dct'),
                 file_name=f"batch_stego_dct_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
                 mime="application/zip"
@@ -1359,7 +1365,7 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col2:
             st.download_button(
-                label="🖼️ Semua Stego IWT (ZIP)",
+                label=" Semua Stego IWT (ZIP)",
                 data=get_zip_stego_images(batch_stego_all, method='iwt'),
                 file_name=f"batch_stego_iwt_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
                 mime="application/zip"
@@ -1367,7 +1373,7 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
         with col3:
             st.download_button(
-                label="🖼️ Semua Stego (DCT+IWT ZIP)",
+                label=" Semua Stego (DCT+IWT ZIP)",
                 data=get_zip_stego_images(batch_stego_all, method='both'),
                 file_name=f"batch_stego_all_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
                 mime="application/zip"
@@ -1379,7 +1385,6 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 def main():
     # Sidebar - Parameter Configuration
     st.sidebar.title("⚙️ Parameter Penelitian")
-    st.sidebar.markdown("*Fixed Parameters (tidak dapat diubah)*")
     st.sidebar.markdown("---")
 
     # Fixed parameters
@@ -1429,7 +1434,6 @@ def main():
     st.sidebar.markdown(
         "**Aplikasi Analisis Keamanan Steganografi DCT vs IWT**\n\n"
         "Dibuat untuk analisis skripsi perbandingan metode steganografi citra.\n\n"
-        "© 2025 - All Rights Reserved"
     )
 
 if __name__ == "__main__":
