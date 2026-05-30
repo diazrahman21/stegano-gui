@@ -189,6 +189,76 @@ st.markdown("""
         padding: 2rem 1.5rem;
     }
 
+    .sidebar-section-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 0.9rem 0 0.35rem;
+    }
+
+    .sidebar-section-note {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        font-style: italic;
+        margin-bottom: 0.75rem;
+    }
+
+    .sidebar-param-card {
+        background: var(--bg-elev);
+        border: 1px solid var(--border-soft);
+        border-radius: 14px;
+        padding: 0.75rem 0.85rem;
+        margin-bottom: 0.6rem;
+        box-shadow: none;
+    }
+
+    .sidebar-param-card .label {
+        display: block;
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 0.18rem;
+    }
+
+    .sidebar-param-card .value {
+        display: block;
+        font-size: 1.18rem;
+        line-height: 1.2;
+        font-weight: 700;
+        color: var(--text-primary);
+        word-break: break-word;
+    }
+
+    .sidebar-param-card .subvalue {
+        display: block;
+        margin-top: 0.1rem;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .stSidebar .stMetric {
+        padding: 0.4rem 0.35rem;
+    }
+
+    .stSidebar .stMetric [data-testid="stMetricLabel"] {
+        font-size: 0.74rem;
+        line-height: 1.2;
+        color: var(--text-muted);
+    }
+
+    .stSidebar .stMetric [data-testid="stMetricValue"] {
+        font-size: 1.15rem;
+        line-height: 1.1;
+    }
+
+    .stSidebar .stSubheader {
+        font-size: 1rem;
+        margin-top: 0.85rem;
+        margin-bottom: 0.35rem;
+    }
+
     .success-box, .info-box {
         background-color: var(--bg-panel);
         border: 1px solid var(--border-soft);
@@ -709,6 +779,20 @@ def get_csv_download_buffer(df):
     df.to_csv(buf, index=False)
     buf.seek(0)
     return buf
+
+def render_sidebar_param_card(title, value, subtitle=None):
+    """Render kartu parameter sidebar yang ringkas dan konsisten."""
+    subtitle_html = f'<span class="subvalue">{subtitle}</span>' if subtitle else ''
+    st.sidebar.markdown(
+        f'''
+        <div class="sidebar-param-card">
+            <span class="label">{title}</span>
+            <span class="value">{value}</span>
+            {subtitle_html}
+        </div>
+        ''',
+        unsafe_allow_html=True
+    )
 
 def get_zip_stego_images(batch_stego_all, method='both'):
     """Buat ZIP file berisi stego images
@@ -1294,63 +1378,33 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 # ============================================================================
 def main():
     # Sidebar - Parameter Configuration
-    st.sidebar.title("⚙️ Konfigurasi Parameter")
+    st.sidebar.title("⚙️ Parameter Penelitian")
+    st.sidebar.markdown("*Fixed Parameters (tidak dapat diubah)*")
     st.sidebar.markdown("---")
 
-    # Image settings
+    # Fixed parameters
+    target_size = (512, 512)
+    wm_size = (64, 64)
+    alpha_dct = 10.0
+    alpha_iwt = 2.0
+    wavelet = 'haar'
+
+    # Image settings - Display Only
     st.sidebar.subheader("📐 Ukuran Citra")
-    target_size_input = st.sidebar.number_input(
-        "Ukuran target (px):",
-        value=512,
-        min_value=256,
-        max_value=1024,
-        step=256
-    )
-    target_size = (target_size_input, target_size_input)
+    render_sidebar_param_card("Ukuran Citra", f"{target_size[0]} × {target_size[1]} px")
 
-    # Watermark settings
+    # Watermark settings - Display Only
     st.sidebar.subheader("🎨 Watermark")
-    wm_size_input = st.sidebar.number_input(
-        "Ukuran watermark (px):",
-        value=64,
-        min_value=32,
-        max_value=128,
-        step=32
-    )
-    wm_size = (wm_size_input, wm_size_input)
+    render_sidebar_param_card("Ukuran Watermark", f"{wm_size[0]} × {wm_size[1]} px")
 
-    # DCT parameters
-    st.sidebar.subheader("DCT Parameter")
-    alpha_dct = st.sidebar.slider(
-        "Alpha DCT:",
-        min_value=1.0,
-        max_value=50.0,
-        value=10.0,
-        step=1.0
-    )
+    # DCT parameters - Display Only
+    st.sidebar.subheader("🔵 DCT Parameter")
+    render_sidebar_param_card("Alpha DCT", f"{alpha_dct:.2f}")
 
-    # IWT parameters
-    st.sidebar.subheader("IWT Parameter")
-    alpha_iwt = st.sidebar.slider(
-        "Alpha IWT:",
-        min_value=0.1,
-        max_value=10.0,
-        value=2.0,
-        step=0.1
-    )
-
-    wavelet = st.sidebar.selectbox(
-        "Wavelet IWT:",
-        options=['haar', 'db2', 'db4']
-    )
-
-    st.sidebar.markdown("---")
-    st.sidebar.info(
-        "💡 **Tips Parameter:**\n\n"
-        "• **Alpha DCT** lebih besar = watermark lebih kuat tapi distorsi lebih besar\n"
-        "• **Alpha IWT** lebih besar = watermark lebih terlihat\n"
-        "• **Haar** wavelet paling cepat, db4 lebih presisi"
-    )
+    # IWT parameters - Display Only
+    st.sidebar.subheader("🟣 IWT Parameter")
+    render_sidebar_param_card("Alpha IWT", f"{alpha_iwt:.2f}")
+    render_sidebar_param_card("Wavelet", wavelet.upper())
 
     # Navigation
     st.sidebar.markdown("---")
