@@ -850,11 +850,7 @@ def page_home():
         - MSE, PSNR, SSIM (Kualitas)
         - NPCR, UACI (Keamanan)
         """)
-
-    with col2:
-        st.image("https://via.placeholder.com/300x200?text=Steganografi", width="stretch")
-
-    st.markdown("---")
+    
 
     st.markdown("""
     #### 🔬 Metode Steganografi
