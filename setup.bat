@@ -22,37 +22,40 @@ if %errorlevel% neq 0 (
 echo [OK] Python terdeteksi
 python --version
 
+set "PYTHON_EXE="
+if exist .venv\Scripts\python.exe (
+    set "PYTHON_EXE=.venv\Scripts\python.exe"
+) else if exist venv\Scripts\python.exe (
+    set "PYTHON_EXE=venv\Scripts\python.exe"
+)
+
 REM Buat virtual environment
 echo.
 echo [STEP 1/4] Membuat virtual environment...
-if exist venv (
+if defined PYTHON_EXE (
     echo Virtual environment sudah ada. Skip...
 ) else (
-    python -m venv venv
+    python -m venv .venv
     if %errorlevel% neq 0 (
         echo [ERROR] Gagal membuat virtual environment
         pause
         exit /b 1
     )
     echo [OK] Virtual environment berhasil dibuat
+    set "PYTHON_EXE=.venv\Scripts\python.exe"
 )
-
-REM Activate virtual environment
-echo.
-echo [STEP 2/4] Mengaktifkan virtual environment...
-call venv\Scripts\activate.bat
 
 REM Upgrade pip
 echo.
-echo [STEP 3/4] Upgrade pip...
-python -m pip install --upgrade pip
+echo [STEP 2/4] Upgrade pip...
+"%PYTHON_EXE%" -m pip install --upgrade pip
 
 REM Install requirements
 echo.
-echo [STEP 4/4] Install dependencies dari requirements.txt...
+echo [STEP 3/4] Install dependencies dari requirements.txt...
 echo Ini mungkin memakan waktu beberapa menit...
 echo.
-pip install -r requirements.txt
+"%PYTHON_EXE%" -m pip install -r requirements.txt
 
 if %errorlevel% neq 0 (
     echo.
@@ -68,7 +71,7 @@ if %errorlevel% neq 0 (
 REM Generate sample images
 echo.
 echo [OPTIONAL] Generate sample images untuk testing...
-python generate_samples.py
+"%PYTHON_EXE%" generate_samples.py
 
 REM Selesai
 echo.
@@ -77,7 +80,7 @@ echo  SETUP SELESAI!
 echo ============================================================
 echo.
 echo Untuk menjalankan aplikasi, ketik:
-echo   streamlit run app.py
+echo   "%PYTHON_EXE%" -m streamlit run app.py
 echo.
 echo Atau klik run_app.bat
 echo.

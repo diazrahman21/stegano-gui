@@ -511,26 +511,6 @@ def plot_metrics_comparison(df_metrics):
     plt.tight_layout()
     return fig
 
-def build_per_image_table(batch_df, metrics):
-    """Bangun tabel per gambar dengan kolom metrik bertingkat (Metric: DCT vs IWT)."""
-    # Pivot: index=filename, columns=method, values=metrics
-    pivot_df = batch_df.pivot_table(
-        index='filename',
-        columns='method',
-        values=metrics,
-        aggfunc='first'
-    )
-    
-    # Reorder columns: (Metric, Method) dengan urutan Metric pertama, Method kedua
-    # Sehingga hasilnya: MSE-DCT, MSE-IWT, PSNR-DCT, PSNR-IWT, ...
-    ordered_cols = [(metric, method) for metric in metrics for method in ['DCT', 'IWT']]
-    pivot_df = pivot_df[ordered_cols]
-    
-    # Set nama level pada MultiIndex
-    pivot_df.columns.names = ['Metric', 'Method']
-    
-    return pivot_df
-
 def format_detail_table(batch_df, metrics):
     """Format tabel detail dengan kolom metrik bertingkat (Metric: DCT vs IWT)."""
     # Buat MultiIndex columns
@@ -1043,25 +1023,20 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
         detail_formatted = format_detail_table(batch_df, metrics_list)
         st.dataframe(detail_formatted.round(4), use_container_width=True)
 
-        # ===== TABEL PER GAMBAR (DCT VS IWT) =====
-        st.markdown("### 4️⃣ Tabel Per Gambar (DCT vs IWT)")
-        per_image_df = build_per_image_table(batch_df, ['MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)'])
-        st.dataframe(per_image_df.round(4), use_container_width=True)
-
         # ===== TABEL RINGKASAN =====
-        st.markdown("### 5️⃣ Tabel Ringkasan (Rata-rata & Std Dev)")
+        st.markdown("### 4️⃣ Tabel Ringkasan (Rata-rata & Std Dev)")
         summary_df = batch_df.groupby('method')[['MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)']].agg(
             ['mean', 'std']
         ).round(4)
         st.dataframe(summary_df, use_container_width=True)
 
         # ===== GRAFIK PERBANDINGAN =====
-        st.markdown("### 6️⃣ Grafik Perbandingan")
+        st.markdown("### 5️⃣ Grafik Perbandingan")
         fig_batch = plot_batch_metrics(batch_df)
         st.pyplot(fig_batch, use_container_width=True)
 
         # ===== PREVIEW CITRA =====
-        st.markdown("### 7️⃣ Preview Citra (Maksimal 6 Gambar)")
+        st.markdown("### 6️⃣ Preview Citra (Maksimal 6 Gambar)")
 
         for preview_idx, preview in enumerate(batch_preview):
             col1, col2, col3 = st.columns(3)

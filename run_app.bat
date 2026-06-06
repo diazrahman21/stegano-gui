@@ -7,19 +7,27 @@ echo  Aplikasi Analisis Steganografi DCT vs IWT
 echo ============================================================
 echo.
 
-REM Cek apakah requirements terinstall
-pip show streamlit >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [ERROR] Dependencies belum terinstall!
+set "PYTHON_EXE="
+if exist .venv\Scripts\python.exe (
+    set "PYTHON_EXE=.venv\Scripts\python.exe"
+) else if exist venv\Scripts\python.exe (
+    set "PYTHON_EXE=venv\Scripts\python.exe"
+)
+
+if not defined PYTHON_EXE (
+    echo [ERROR] Virtual environment tidak ditemukan!
     echo Silakan jalankan setup.bat terlebih dahulu
     pause
     exit /b 1
 )
 
-REM Activate virtual environment jika ada
-if exist venv\Scripts\activate.bat (
-    echo [INFO] Mengaktifkan virtual environment...
-    call venv\Scripts\activate.bat
+REM Cek apakah Streamlit terinstall di environment lokal
+"%PYTHON_EXE%" -m pip show streamlit >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Streamlit belum terinstall di virtual environment!
+    echo Silakan jalankan setup.bat terlebih dahulu
+    pause
+    exit /b 1
 )
 
 echo.
@@ -32,6 +40,6 @@ echo ============================================================
 echo.
 
 REM Run streamlit
-streamlit run app.py
+"%PYTHON_EXE%" -m streamlit run app.py
 
 pause
