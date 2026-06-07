@@ -302,6 +302,41 @@ def preprocess_image(image_bytes, target_size=(512, 512)):
     
     return img_resized
 
+def plot_preprocessing_visual(image_bytes, target_size=(512, 512)):
+    """Buat visualisasi proses preprocessing: original -> grayscale -> resize."""
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    if img_bgr is None:
+        raise ValueError("File tidak dapat dibaca sebagai citra")
+
+    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+
+    if len(img_bgr.shape) == 3:
+        img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    else:
+        img_gray = img_bgr
+
+    img_resized = cv2.resize(img_gray, target_size, interpolation=cv2.INTER_AREA)
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+    axes[0].imshow(img_rgb)
+    axes[0].set_title("Citra Asli", fontsize=12, fontweight='bold')
+    axes[0].axis('off')
+
+    axes[1].imshow(img_gray, cmap='gray', vmin=0, vmax=255)
+    axes[1].set_title("Grayscale", fontsize=12, fontweight='bold')
+    axes[1].axis('off')
+
+    axes[2].imshow(img_resized, cmap='gray', vmin=0, vmax=255)
+    axes[2].set_title(f"Resize {target_size[0]}×{target_size[1]}", fontsize=12, fontweight='bold')
+    axes[2].axis('off')
+
+    fig.suptitle("Visualisasi Preprocessing Citra", fontsize=14, fontweight='bold', y=1.02)
+    plt.tight_layout()
+    return fig, img_resized
+
 # ============================================================================
 # FUNGSI KONVERSI TEKS KE BINER
 # ============================================================================
@@ -814,7 +849,7 @@ def get_zip_stego_images(batch_stego_all, method='both'):
 # HALAMAN UTAMA (HOME)
 # ============================================================================
 def page_home():
-    st.title("🔐 Analisis Keamanan Steganografi Citra")
+    st.title("🔐 Analisis Kinerja Steganografi Citra")
     st.markdown("### DCT vs IWT - Perbandingan Kualitas dan Keamanan")
 
     col1, col2 = st.columns([2, 1])
@@ -887,6 +922,27 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
         return
 
     st.info(f"📁 Anda telah upload {len(uploaded_files)} gambar")
+
+    st.markdown("### 1️⃣ Visualisasi Preprocessing")
+    preview_file = uploaded_files[0]
+    try:
+        preprocess_fig, preprocess_result = plot_preprocessing_visual(preview_file.getvalue(), target_size)
+        st.pyplot(preprocess_fig, use_container_width=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button(
+                label=" Unduh Visualisasi Preprocessing (PNG)",
+                data=get_download_buffer(preprocess_fig),
+                file_name=f"preprocessing_{os.path.splitext(preview_file.name)[0]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                mime="image/png"
+            )
+
+        with col2:
+            st.caption(f"Pratinjau diambil dari file: {preview_file.name}")
+            st.caption(f"Hasil akhir preprocessing berukuran {preprocess_result.shape[1]}×{preprocess_result.shape[0]} px")
+    except Exception as e:
+        st.error(f"Gagal membuat visualisasi preprocessing: {str(e)}")
 
     # ===== INPUT WATERMARK =====
     st.markdown("### 2️⃣ Input Pesan / Watermark")
