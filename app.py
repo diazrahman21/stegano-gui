@@ -16,7 +16,7 @@ from datetime import datetime
 # KONFIGURASI STREAMLIT
 # ============================================================================
 st.set_page_config(
-    page_title="Analisis Keamanan Steganografi DCT vs IWT",
+    page_title="Analisis Kinerja Steganografi DCT dan IWT",
     page_icon="🔐",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -336,6 +336,83 @@ def plot_preprocessing_visual(image_bytes, target_size=(512, 512)):
     fig.suptitle("Visualisasi Preprocessing Citra", fontsize=14, fontweight='bold', y=1.02)
     plt.tight_layout()
     return fig, img_resized
+
+def plot_dct_transform_visual(image_bytes, target_size=(512, 512)):
+    """Buat visualisasi alur transformasi DCT untuk kebutuhan PPT."""
+    cover = preprocess_image(image_bytes, target_size)
+
+    h, w = cover.shape
+    block_size = 8
+    grid_preview = cv2.cvtColor(cover, cv2.COLOR_GRAY2RGB)
+    for y in range(0, h, block_size):
+        cv2.line(grid_preview, (0, y), (w, y), (255, 180, 0), 1)
+    for x in range(0, w, block_size):
+        cv2.line(grid_preview, (x, 0), (x, h), (255, 180, 0), 1)
+
+    block = cover[:8, :8].astype(np.float32)
+    dct_block = dct(dct(block, axis=0, norm='ortho'), axis=1, norm='ortho')
+    dct_display = np.log1p(np.abs(dct_block))
+
+    stego_preview = embed_dct(cover, np.zeros((h // 8, w // 8), dtype=np.uint8), alpha=10.0)
+
+    fig, axes = plt.subplots(1, 4, figsize=(18, 5))
+
+    axes[0].imshow(cover, cmap='gray', vmin=0, vmax=255)
+    axes[0].set_title("1. Grayscale Input", fontsize=12, fontweight='bold')
+    axes[0].axis('off')
+
+    axes[1].imshow(grid_preview)
+    axes[1].set_title("2. Blok 8×8", fontsize=12, fontweight='bold')
+    axes[1].axis('off')
+
+    im = axes[2].imshow(dct_display, cmap='magma')
+    axes[2].set_title("3. DCT pada Blok 8×8", fontsize=12, fontweight='bold')
+    axes[2].axis('off')
+    fig.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
+
+    axes[3].imshow(stego_preview, cmap='gray', vmin=0, vmax=255)
+    axes[3].set_title("4. Hasil Stego", fontsize=12, fontweight='bold')
+    axes[3].axis('off')
+
+    fig.suptitle("Visualisasi Proses Transformasi DCT", fontsize=14, fontweight='bold', y=1.03)
+    plt.tight_layout()
+    return fig
+
+def plot_iwt_transform_visual(image_bytes, target_size=(512, 512)):
+    """Buat visualisasi alur transformasi IWT untuk kebutuhan PPT."""
+    cover = preprocess_image(image_bytes, target_size)
+
+    cover_int = cover.astype(np.int16)
+    LL, (LH, HL, HH) = pywt.dwt2(cover_int, 'haar')
+    stego_preview = embed_iwt_hh(cover, np.zeros((64, 64), dtype=np.uint8), alpha=2.0, wavelet='haar')
+
+    fig, axes = plt.subplots(1, 4, figsize=(18, 5))
+
+    axes[0].imshow(cover, cmap='gray', vmin=0, vmax=255)
+    axes[0].set_title("1. Grayscale Input", fontsize=12, fontweight='bold')
+    axes[0].axis('off')
+
+    subbands = np.block([
+        [LL, LH],
+        [HL, HH]
+    ])
+    axes[1].imshow(subbands, cmap='gray')
+    axes[1].set_title("2. Dekomposisi IWT 1 Level", fontsize=12, fontweight='bold')
+    axes[1].axis('off')
+
+    hh_display = np.log1p(np.abs(HH))
+    im = axes[2].imshow(hh_display, cmap='viridis')
+    axes[2].set_title("3. Subband HH", fontsize=12, fontweight='bold')
+    axes[2].axis('off')
+    fig.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
+
+    axes[3].imshow(stego_preview, cmap='gray', vmin=0, vmax=255)
+    axes[3].set_title("4. Hasil Stego", fontsize=12, fontweight='bold')
+    axes[3].axis('off')
+
+    fig.suptitle("Visualisasi Proses Transformasi IWT", fontsize=14, fontweight='bold', y=1.03)
+    plt.tight_layout()
+    return fig
 
 # ============================================================================
 # FUNGSI KONVERSI TEKS KE BINER
@@ -850,7 +927,7 @@ def get_zip_stego_images(batch_stego_all, method='both'):
 # ============================================================================
 def page_home():
     st.title("🔐 Analisis Kinerja Steganografi Citra")
-    st.markdown("### DCT vs IWT - Perbandingan Kualitas dan Keamanan")
+    st.markdown("### DCT dan IWT - Perbandingan Kualitas dan Keamanan")
 
     col1, col2 = st.columns([2, 1])
 
@@ -944,8 +1021,39 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
     except Exception as e:
         st.error(f"Gagal membuat visualisasi preprocessing: {str(e)}")
 
+    st.markdown("### 2️⃣ Visualisasi Transformasi DCT dan IWT")
+    col_dct, col_iwt = st.columns(2)
+
+    try:
+        dct_fig = plot_dct_transform_visual(preview_file.getvalue(), target_size)
+        with col_dct:
+            st.pyplot(dct_fig, use_container_width=True)
+            st.download_button(
+                label=" Unduh Visual DCT (PNG)",
+                data=get_download_buffer(dct_fig),
+                file_name=f"visual_dct_{os.path.splitext(preview_file.name)[0]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                mime="image/png"
+            )
+    except Exception as e:
+        with col_dct:
+            st.error(f"Gagal membuat visualisasi DCT: {str(e)}")
+
+    try:
+        iwt_fig = plot_iwt_transform_visual(preview_file.getvalue(), target_size)
+        with col_iwt:
+            st.pyplot(iwt_fig, use_container_width=True)
+            st.download_button(
+                label=" Unduh Visual IWT (PNG)",
+                data=get_download_buffer(iwt_fig),
+                file_name=f"visual_iwt_{os.path.splitext(preview_file.name)[0]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                mime="image/png"
+            )
+    except Exception as e:
+        with col_iwt:
+            st.error(f"Gagal membuat visualisasi IWT: {str(e)}")
+
     # ===== INPUT WATERMARK =====
-    st.markdown("### 2️⃣ Input Pesan / Watermark")
+    st.markdown("### 3️⃣ Input Pesan / Watermark")
 
     watermark_choice = st.radio("Pilih sumber watermark:", 
                                 ["Watermark Acak", "Upload File TXT"])
@@ -1192,21 +1300,13 @@ def main():
     wavelet = 'haar'
 
     # Image settings - Display Only
-    st.sidebar.subheader("📐 Ukuran Citra")
+    st.sidebar.subheader("Ukuran Citra")
     render_sidebar_param_card("Ukuran Citra", f"{target_size[0]} × {target_size[1]} px")
 
     # Watermark settings - Display Only
-    st.sidebar.subheader("🎨 Watermark")
-    render_sidebar_param_card("Ukuran Watermark", f"{wm_size[0]} × {wm_size[1]} px")
-
-    # DCT parameters - Display Only
-    st.sidebar.subheader("🔵 DCT Parameter")
-    render_sidebar_param_card("Alpha DCT", f"{alpha_dct:.2f}")
-
-    # IWT parameters - Display Only
-    st.sidebar.subheader("🟣 IWT Parameter")
-    render_sidebar_param_card("Alpha IWT", f"{alpha_iwt:.2f}")
-    render_sidebar_param_card("Wavelet", wavelet.upper())
+    st.sidebar.subheader("Citra Grayscale")
+    
+    
 
     # Navigation
     st.sidebar.markdown("---")
@@ -1228,7 +1328,7 @@ def main():
     # Footer
     st.sidebar.markdown("---")
     st.sidebar.markdown(
-        "**Aplikasi Analisis Keamanan Steganografi DCT vs IWT**\n\n"
+        "**Analisis Kinerja Steganografi DCT vs IWT**\n\n"
         "Dibuat untuk analisis skripsi perbandingan metode steganografi citra.\n\n"
     )
 
