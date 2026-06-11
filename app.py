@@ -302,118 +302,6 @@ def preprocess_image(image_bytes, target_size=(512, 512)):
     
     return img_resized
 
-def plot_preprocessing_visual(image_bytes, target_size=(512, 512)):
-    """Buat visualisasi proses preprocessing: original -> grayscale -> resize."""
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-    if img_bgr is None:
-        raise ValueError("File tidak dapat dibaca sebagai citra")
-
-    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-
-    if len(img_bgr.shape) == 3:
-        img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-    else:
-        img_gray = img_bgr
-
-    img_resized = cv2.resize(img_gray, target_size, interpolation=cv2.INTER_AREA)
-
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-
-    axes[0].imshow(img_rgb)
-    axes[0].set_title("Citra Asli", fontsize=12, fontweight='bold')
-    axes[0].axis('off')
-
-    axes[1].imshow(img_gray, cmap='gray', vmin=0, vmax=255)
-    axes[1].set_title("Grayscale", fontsize=12, fontweight='bold')
-    axes[1].axis('off')
-
-    axes[2].imshow(img_resized, cmap='gray', vmin=0, vmax=255)
-    axes[2].set_title(f"Resize {target_size[0]}×{target_size[1]}", fontsize=12, fontweight='bold')
-    axes[2].axis('off')
-
-    fig.suptitle("Visualisasi Preprocessing Citra", fontsize=14, fontweight='bold', y=1.02)
-    plt.tight_layout()
-    return fig, img_resized
-
-def plot_dct_transform_visual(image_bytes, target_size=(512, 512)):
-    """Buat visualisasi alur transformasi DCT untuk kebutuhan PPT."""
-    cover = preprocess_image(image_bytes, target_size)
-
-    h, w = cover.shape
-    block_size = 8
-    grid_preview = cv2.cvtColor(cover, cv2.COLOR_GRAY2RGB)
-    for y in range(0, h, block_size):
-        cv2.line(grid_preview, (0, y), (w, y), (255, 180, 0), 1)
-    for x in range(0, w, block_size):
-        cv2.line(grid_preview, (x, 0), (x, h), (255, 180, 0), 1)
-
-    block = cover[:8, :8].astype(np.float32)
-    dct_block = dct(dct(block, axis=0, norm='ortho'), axis=1, norm='ortho')
-    dct_display = np.log1p(np.abs(dct_block))
-
-    stego_preview = embed_dct(cover, np.zeros((h // 8, w // 8), dtype=np.uint8), alpha=10.0)
-
-    fig, axes = plt.subplots(1, 4, figsize=(18, 5))
-
-    axes[0].imshow(cover, cmap='gray', vmin=0, vmax=255)
-    axes[0].set_title("1. Grayscale Input", fontsize=12, fontweight='bold')
-    axes[0].axis('off')
-
-    axes[1].imshow(grid_preview)
-    axes[1].set_title("2. Blok 8×8", fontsize=12, fontweight='bold')
-    axes[1].axis('off')
-
-    im = axes[2].imshow(dct_display, cmap='magma')
-    axes[2].set_title("3. DCT pada Blok 8×8", fontsize=12, fontweight='bold')
-    axes[2].axis('off')
-    fig.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
-
-    axes[3].imshow(stego_preview, cmap='gray', vmin=0, vmax=255)
-    axes[3].set_title("4. Hasil Stego", fontsize=12, fontweight='bold')
-    axes[3].axis('off')
-
-    fig.suptitle("Visualisasi Proses Transformasi DCT", fontsize=14, fontweight='bold', y=1.03)
-    plt.tight_layout()
-    return fig
-
-def plot_iwt_transform_visual(image_bytes, target_size=(512, 512)):
-    """Buat visualisasi alur transformasi IWT untuk kebutuhan PPT."""
-    cover = preprocess_image(image_bytes, target_size)
-
-    cover_int = cover.astype(np.int16)
-    LL, (LH, HL, HH) = pywt.dwt2(cover_int, 'haar')
-    stego_preview = embed_iwt_hh(cover, np.zeros((64, 64), dtype=np.uint8), alpha=2.0, wavelet='haar')
-
-    fig, axes = plt.subplots(1, 4, figsize=(18, 5))
-
-    axes[0].imshow(cover, cmap='gray', vmin=0, vmax=255)
-    axes[0].set_title("1. Grayscale Input", fontsize=12, fontweight='bold')
-    axes[0].axis('off')
-
-    subbands = np.block([
-        [LL, LH],
-        [HL, HH]
-    ])
-    axes[1].imshow(subbands, cmap='gray')
-    axes[1].set_title("2. Dekomposisi IWT 1 Level", fontsize=12, fontweight='bold')
-    axes[1].axis('off')
-
-    hh_display = np.log1p(np.abs(HH))
-    im = axes[2].imshow(hh_display, cmap='viridis')
-    axes[2].set_title("3. Subband HH", fontsize=12, fontweight='bold')
-    axes[2].axis('off')
-    fig.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
-
-    axes[3].imshow(stego_preview, cmap='gray', vmin=0, vmax=255)
-    axes[3].set_title("4. Hasil Stego", fontsize=12, fontweight='bold')
-    axes[3].axis('off')
-
-    fig.suptitle("Visualisasi Proses Transformasi IWT", fontsize=14, fontweight='bold', y=1.03)
-    plt.tight_layout()
-    return fig
-
 # ============================================================================
 # FUNGSI KONVERSI TEKS KE BINER
 # ============================================================================
@@ -698,57 +586,35 @@ def generate_conclusion(df_metrics):
 
     # MSE
     mse_best = df_metrics['MSE'].idxmin()
-    conclusion.append(f"🥇 **Metode dengan MSE terbaik:** {mse_best} ({df_metrics.loc[mse_best, 'MSE']:.4f})")
+    conclusion.append(f"**Metode dengan MSE terbaik:** {mse_best} ({df_metrics.loc[mse_best, 'MSE']:.4f})")
 
     # PSNR
     psnr_best = df_metrics['PSNR (dB)'].idxmax()
-    conclusion.append(f"🥇 **Metode dengan PSNR terbaik:** {psnr_best} ({df_metrics.loc[psnr_best, 'PSNR (dB)']:.4f} dB)")
+    conclusion.append(f"**Metode dengan PSNR terbaik:** {psnr_best} ({df_metrics.loc[psnr_best, 'PSNR (dB)']:.4f} dB)")
 
     # SSIM
     ssim_best = df_metrics['SSIM'].idxmax()
-    conclusion.append(f"🥇 **Metode dengan SSIM terbaik:** {ssim_best} ({df_metrics.loc[ssim_best, 'SSIM']:.4f})")
+    conclusion.append(f"**Metode dengan SSIM terbaik:** {ssim_best} ({df_metrics.loc[ssim_best, 'SSIM']:.4f})")
 
     # NPCR
-    npcr_best = df_metrics['NPCR (%)'].idxmax()
-    conclusion.append(f"🥇 **Metode dengan NPCR terbaik:** {npcr_best} ({df_metrics.loc[npcr_best, 'NPCR (%)']:.4f}%)")
+    npcr_best = df_metrics['NPCR (%)'].idxmin()
+    conclusion.append(f"**Metode dengan NPCR terbaik:** {npcr_best} ({df_metrics.loc[npcr_best, 'NPCR (%)']:.4f}%)")
 
     # UACI
     uaci_best = df_metrics['UACI (%)'].idxmax()
-    conclusion.append(f"🥇 **Metode dengan UACI terbaik:** {uaci_best} ({df_metrics.loc[uaci_best, 'UACI (%)']:.4f}%)")
-
-    # Kualitas vs Keamanan
-    mse_winner = df_metrics['MSE'].idxmin()
-    psnr_winner = df_metrics['PSNR (dB)'].idxmax()
-    ssim_winner = df_metrics['SSIM'].idxmax()
-    quality_votes = {mse_winner: 1, psnr_winner: 1, ssim_winner: 1}
-    quality_best = max(quality_votes, key=quality_votes.get)
-
-    npcr_winner = df_metrics['NPCR (%)'].idxmax()
-    uaci_winner = df_metrics['UACI (%)'].idxmax()
-    security_votes = {npcr_winner: 1, uaci_winner: 1}
-    security_best = max(security_votes, key=security_votes.get)
-
-    conclusion.append(f"\n📊 **Kualitas Citra:** {quality_best} lebih unggul (MSE/PSNR/SSIM)")
-    conclusion.append(f"🔒 **Keamanan Steganografi:** {security_best} lebih unggul (NPCR/UACI)")
-
-    if quality_best == security_best:
-        conclusion.append(f"\n✅ **Kesimpulan:** {quality_best} lebih konsisten unggul pada kualitas dan keamanan.")
-    else:
-        conclusion.append(f"\n⚠️ **Kesimpulan:** Terdapat trade-off antara kualitas dan keamanan.")
-        conclusion.append(f"   - Pilih {quality_best} untuk memprioritaskan kualitas visual")
-        conclusion.append(f"   - Pilih {security_best} untuk memprioritaskan keamanan steganografi")
+    conclusion.append(f"**Metode dengan UACI terbaik:** {uaci_best} ({df_metrics.loc[uaci_best, 'UACI (%)']:.4f}%)")
 
     return "\n".join(conclusion)
 
 # ============================================================================
 # FUNGSI BATCH PROCESSING
 # ============================================================================
-def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_iwt, wavelet, watermark_mode='random', watermark_data=None):
+def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_iwt, wavelet, watermark_mode='text', watermark_data=None):
     """Proses batch gambar dengan ekstraksi
     
     Args:
-        watermark_mode: 'random' atau 'text'
-        watermark_data: numpy array untuk embedding
+        watermark_mode: mode watermark, hanya 'text' digunakan
+        watermark_data: numpy array hasil konversi TXT untuk embedding
     Returns:
         batch_rows: list of metric dicts
         batch_preview: list of image preview dicts
@@ -764,15 +630,11 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
             img_bytes = uploaded_file.read()
             cover = preprocess_image(img_bytes, target_size)
 
-            # Generate atau gunakan watermark
-            if watermark_mode == 'text' and watermark_data is not None:
-                watermark = watermark_data
-                original_message = None
-            else:
-                # Generate watermark acak per gambar
-                rng = np.random.default_rng(42 + idx)
-                watermark = rng.integers(0, 2, wm_size, dtype=np.uint8)
-                original_message = None
+            if watermark_data is None:
+                raise ValueError('Watermark TXT belum tersedia')
+
+            watermark = watermark_data
+            original_message = None
 
             # Embedding
             stego_dct_img = embed_dct(cover, watermark, alpha=alpha_dct)
@@ -786,7 +648,7 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
             acc_dct = np.mean(extracted_dct == watermark) * 100
             acc_iwt = np.mean(extracted_iwt == watermark) * 100
 
-            # Konversi ke teks jika watermark_mode adalah 'text'
+            # Konversi ke teks untuk watermark berbasis TXT
             extracted_msg_dct = None
             extracted_msg_iwt = None
             if watermark_mode == 'text':
@@ -1000,106 +862,52 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
 
     st.info(f"📁 Anda telah upload {len(uploaded_files)} gambar")
 
-    st.markdown("### 1️⃣ Visualisasi Preprocessing")
-    preview_file = uploaded_files[0]
-    try:
-        preprocess_fig, preprocess_result = plot_preprocessing_visual(preview_file.getvalue(), target_size)
-        st.pyplot(preprocess_fig, use_container_width=True)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button(
-                label=" Unduh Visualisasi Preprocessing (PNG)",
-                data=get_download_buffer(preprocess_fig),
-                file_name=f"preprocessing_{os.path.splitext(preview_file.name)[0]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-                mime="image/png"
-            )
-
-        with col2:
-            st.caption(f"Pratinjau diambil dari file: {preview_file.name}")
-            st.caption(f"Hasil akhir preprocessing berukuran {preprocess_result.shape[1]}×{preprocess_result.shape[0]} px")
-    except Exception as e:
-        st.error(f"Gagal membuat visualisasi preprocessing: {str(e)}")
-
-    st.markdown("### 2️⃣ Visualisasi Transformasi DCT dan IWT")
-    col_dct, col_iwt = st.columns(2)
-
-    try:
-        dct_fig = plot_dct_transform_visual(preview_file.getvalue(), target_size)
-        with col_dct:
-            st.pyplot(dct_fig, use_container_width=True)
-            st.download_button(
-                label=" Unduh Visual DCT (PNG)",
-                data=get_download_buffer(dct_fig),
-                file_name=f"visual_dct_{os.path.splitext(preview_file.name)[0]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-                mime="image/png"
-            )
-    except Exception as e:
-        with col_dct:
-            st.error(f"Gagal membuat visualisasi DCT: {str(e)}")
-
-    try:
-        iwt_fig = plot_iwt_transform_visual(preview_file.getvalue(), target_size)
-        with col_iwt:
-            st.pyplot(iwt_fig, use_container_width=True)
-            st.download_button(
-                label=" Unduh Visual IWT (PNG)",
-                data=get_download_buffer(iwt_fig),
-                file_name=f"visual_iwt_{os.path.splitext(preview_file.name)[0]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-                mime="image/png"
-            )
-    except Exception as e:
-        with col_iwt:
-            st.error(f"Gagal membuat visualisasi IWT: {str(e)}")
-
     # ===== INPUT WATERMARK =====
-    st.markdown("### 3️⃣ Input Pesan / Watermark")
-
-    watermark_choice = st.radio("Pilih sumber watermark:", 
-                                ["Watermark Acak", "Upload File TXT"])
+    st.markdown("### 2️⃣ Input Pesan / Watermark")
 
     watermark_batch = None
-    watermark_mode = 'random'
+    watermark_mode = 'text'
 
-    if watermark_choice == "Upload File TXT":
-        txt_file = st.file_uploader("Upload file TXT", type=['txt'], key='batch_txt')
+    txt_file = st.file_uploader("Upload file TXT", type=['txt'], key='batch_txt')
 
-        if txt_file is not None:
-            try:
-                original_text = txt_file.read().decode('utf-8', errors='ignore')
-                message_binary = text_to_binary(original_text)
+    if txt_file is not None:
+        try:
+            original_text = txt_file.read().decode('utf-8', errors='ignore')
+            message_binary = text_to_binary(original_text)
 
-                # Cek kapasitas
-                total_capacity = wm_size[0] * wm_size[1]
-                if len(message_binary) > total_capacity:
-                    st.error(f"❌ Pesan terlalu panjang! Maksimal {total_capacity // 8} karakter. "
-                            f"Anda memasukkan {len(original_text)} karakter.")
-                else:
-                    message_binary_padded = message_binary.ljust(total_capacity, '0')
-                    watermark_batch = np.array([int(bit) for bit in message_binary_padded], 
-                                        dtype=np.uint8).reshape(wm_size)
-                    watermark_mode = 'text'
+            # Cek kapasitas
+            total_capacity = wm_size[0] * wm_size[1]
+            if len(message_binary) > total_capacity:
+                st.error(f"❌ Pesan terlalu panjang! Maksimal {total_capacity // 8} karakter. "
+                        f"Anda memasukkan {len(original_text)} karakter.")
+            else:
+                message_binary_padded = message_binary.ljust(total_capacity, '0')
+                watermark_batch = np.array([int(bit) for bit in message_binary_padded], 
+                                    dtype=np.uint8).reshape(wm_size)
 
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Nama File", txt_file.name)
-                    with col2:
-                        st.metric("Panjang Pesan", f"{len(original_text)} karakter")
-                    with col3:
-                        st.metric("Panjang Biner", f"{len(message_binary)} bit")
-                    with col4:
-                        st.metric("Kapasitas", f"{total_capacity} bit")
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Nama File", txt_file.name)
+                with col2:
+                    st.metric("Panjang Pesan", f"{len(original_text)} karakter")
+                with col3:
+                    st.metric("Panjang Biner", f"{len(message_binary)} bit")
+                with col4:
+                    st.metric("Kapasitas", f"{total_capacity} bit")
 
-                    st.success("✅ Pesan berhasil dikonversi ke watermark")
+                st.success("✅ Pesan berhasil dikonversi ke watermark")
 
-            except Exception as e:
-                st.error(f"❌ Error membaca file: {str(e)}")
-
-    if watermark_choice == "Watermark Acak" or watermark_batch is None:
-        st.info("✅ Watermark acak akan digunakan untuk setiap gambar (berbeda per gambar)")
+        except Exception as e:
+            st.error(f"❌ Error membaca file: {str(e)}")
+    else:
+        st.info("⬆️ Silakan upload file TXT untuk watermark")
 
     # Proses batch
     if st.button("🚀 Mulai Proses Batch", key="process_batch", use_container_width=True):
+        if watermark_batch is None:
+            st.error("❌ Upload file TXT terlebih dahulu sebelum memproses batch")
+            return
+
         # Container untuk progress
         progress_container = st.container()
         extraction_results_container = st.container()
@@ -1167,9 +975,9 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
                             )
                             st.metric("Akurasi", f"{result['acc_iwt']:.2f}%")
         else:
-            # Untuk watermark acak, tampilkan ringkas akurasi
+            # Untuk watermark berbasis TXT, tampilkan ringkas akurasi
             with extraction_results_container:
-                st.markdown("### 🔐 Hasil Ekstraksi (Watermark Acak)")
+                st.markdown("### 🔐 Hasil Ekstraksi (Watermark TXT)")
                 
                 extraction_acc_data = []
                 for result in extraction_results:
