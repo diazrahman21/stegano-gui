@@ -462,6 +462,27 @@ def evaluate_all(cover, stego):
         'UACI (%)': float(uaci_val),
     }
 
+def get_png_size_bytes(img_array):
+    """Hitung ukuran byte citra jika disimpan sebagai PNG."""
+    img_pil = Image.fromarray(img_array)
+    buf = io.BytesIO()
+    img_pil.save(buf, format='PNG')
+    return len(buf.getvalue())
+
+def bytes_to_display_kb(size_bytes):
+    """Konversi byte ke KB tampilan dengan pembulatan ke atas."""
+    return int(np.ceil(size_bytes / 1024)) if size_bytes else 0
+
+def build_size_change_row(filename, method, original_bytes, stego_png_bytes):
+    """Buat baris tabel perubahan ukuran file untuk satu metode steganografi."""
+    return {
+        'filename': filename,
+        'method': method,
+        'Ukuran Asli (KB)': bytes_to_display_kb(original_bytes),
+        'Ukuran Stego PNG (KB)': bytes_to_display_kb(stego_png_bytes),
+        'Perubahan Ukuran (%)': ((stego_png_bytes - original_bytes) / original_bytes * 100) if original_bytes else 0,
+    }
+
 # ============================================================================
 # FUNGSI VISUALISASI
 # ============================================================================
@@ -547,6 +568,21 @@ def format_detail_table(batch_df, metrics):
     
     return result
 
+def format_size_table(size_df):
+    """Format tabel ukuran dengan kolom DCT dan IWT seperti tabel detail."""
+    metrics = ['Ukuran Asli (KB)', 'Ukuran Stego PNG (KB)', 'Perubahan Ukuran (%)']
+    result = size_df.pivot_table(
+        index='filename',
+        columns='method',
+        values=metrics,
+        aggfunc='first'
+    )
+
+    ordered_cols = [(metric, method) for metric in metrics for method in ['DCT', 'IWT']]
+    result = result[ordered_cols]
+    result.columns.names = ['Ukuran', 'Method']
+    return result
+
 def plot_batch_metrics(batch_df):
     """Visualisasi perbandingan metrik batch"""
     fig, axes = plt.subplots(2, 3, figsize=(16, 10))
@@ -621,6 +657,7 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
         extraction_results: list of extraction result dicts
     """
     batch_rows = []
+    size_rows = []
     batch_preview = []
     batch_stego_all = []  # Simpan semua stego images untuk download
     extraction_results = []
@@ -628,6 +665,7 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
     for idx, uploaded_file in enumerate(uploaded_files):
         try:
             img_bytes = uploaded_file.read()
+            original_size_bytes = len(img_bytes)
             cover = preprocess_image(img_bytes, target_size)
 
             if watermark_data is None:
@@ -660,6 +698,8 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
             # Metrik
             dct_m = evaluate_all(cover, stego_dct_img)
             iwt_m = evaluate_all(cover, stego_iwt_img)
+            dct_png_size_bytes = get_png_size_bytes(stego_dct_img)
+            iwt_png_size_bytes = get_png_size_bytes(stego_iwt_img)
 
             batch_rows.append({
                 'filename': uploaded_file.name,
@@ -671,6 +711,18 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
                 'method': 'IWT',
                 **iwt_m
             })
+            size_rows.append(build_size_change_row(
+                uploaded_file.name,
+                'DCT',
+                original_size_bytes,
+                dct_png_size_bytes,
+            ))
+            size_rows.append(build_size_change_row(
+                uploaded_file.name,
+                'IWT',
+                original_size_bytes,
+                iwt_png_size_bytes,
+            ))
 
             # Simpan hasil ekstraksi
             extraction_results.append({
@@ -707,7 +759,7 @@ def process_batch_images(uploaded_files, target_size, wm_size, alpha_dct, alpha_
             st.warning(f"⚠️ Gagal memproses {uploaded_file.name}: {str(e)}")
             continue
 
-    return batch_rows, batch_preview, extraction_results, batch_stego_all
+    return batch_rows, size_rows, batch_preview, extraction_results, batch_stego_all
 
 # ============================================================================
 # FUNGSI DOWNLOAD
@@ -914,7 +966,7 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
         
         with progress_container:
             with st.spinner(f"⏳ Sedang memproses {len(uploaded_files)} gambar..."):
-                batch_rows, batch_preview, extraction_results, batch_stego_all = process_batch_images(
+                batch_rows, size_rows, batch_preview, extraction_results, batch_stego_all = process_batch_images(
                     uploaded_files, target_size, wm_size, alpha_dct, alpha_iwt, wavelet,
                     watermark_mode=watermark_mode, watermark_data=watermark_batch
                 )
@@ -926,6 +978,13 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
         batch_df = pd.DataFrame(batch_rows)
         cols = ['filename', 'method', 'MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)']
         batch_df = batch_df[cols].round(4)
+        size_df = pd.DataFrame(size_rows)
+        size_formatted = format_size_table(size_df)
+        for method in ['DCT', 'IWT']:
+            size_formatted[('Perubahan Ukuran (%)', method)] = size_formatted[
+                ('Perubahan Ukuran (%)', method)
+            ].round(2)
+        size_summary_df = size_df.groupby('method')[['Perubahan Ukuran (%)']].mean().round(2)
 
         st.success(f"✅ Berhasil memproses {len(batch_df) // 2} gambar!")
         
@@ -995,20 +1054,30 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
         detail_formatted = format_detail_table(batch_df, metrics_list)
         st.dataframe(detail_formatted.round(4), use_container_width=True)
 
+        # ===== TABEL PERUBAHAN UKURAN FILE =====
+        st.markdown("### 4. Tabel Perubahan Ukuran Gambar")
+        st.caption(
+            "Ukuran KB dibulatkan ke atas dari byte file. Persentase dihitung dari ukuran byte asli dan stego."
+        )
+        st.dataframe(size_formatted, use_container_width=True)
+
+        st.markdown("#### Rata-rata Perubahan Ukuran")
+        st.dataframe(size_summary_df, use_container_width=True)
+
         # ===== TABEL RINGKASAN =====
-        st.markdown("### 4️⃣ Tabel Ringkasan (Rata-rata & Std Dev)")
+        st.markdown("### 5. Tabel Ringkasan (Rata-rata & Std Dev)")
         summary_df = batch_df.groupby('method')[['MSE', 'PSNR (dB)', 'SSIM', 'NPCR (%)', 'UACI (%)']].agg(
             ['mean', 'std']
         ).round(4)
         st.dataframe(summary_df, use_container_width=True)
 
         # ===== GRAFIK PERBANDINGAN =====
-        st.markdown("### 5️⃣ Grafik Perbandingan")
+        st.markdown("### 6. Grafik Perbandingan")
         fig_batch = plot_batch_metrics(batch_df)
         st.pyplot(fig_batch, use_container_width=True)
 
         # ===== PREVIEW CITRA =====
-        st.markdown("### 6️⃣ Preview Citra (Maksimal 6 Gambar)")
+        st.markdown("### 7. Preview Citra (Maksimal 6 Gambar)")
 
         for preview_idx, preview in enumerate(batch_preview):
             col1, col2, col3 = st.columns(3)
@@ -1037,7 +1106,7 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
         # ===== DOWNLOAD =====
         st.markdown("### 📥 Download Hasil")
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
 
         with col1:
             st.download_button(
@@ -1056,6 +1125,14 @@ def page_batch_processing(target_size, wm_size, alpha_dct, alpha_iwt, wavelet):
             )
 
         with col3:
+            st.download_button(
+                label=" Ukuran CSV",
+                data=get_csv_download_buffer(size_formatted.reset_index()),
+                file_name=f"batch_size_changes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+
+        with col4:
             st.download_button(
                 label=" Grafik (PNG)",
                 data=get_download_buffer(fig_batch),
